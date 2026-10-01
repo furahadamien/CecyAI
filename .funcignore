@@ -1,0 +1,6 @@
+.git
+.gitignore
+local.settings.json
+node_modules
+test
+*.log

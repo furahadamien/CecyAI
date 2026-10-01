@@ -1,0 +1,27 @@
+{
+  "name": "cecy-ai-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "prestart": "npm run clean && npm run build",
+    "start": "func start",
+    "test": "npm run build && node --test dist/test/*.test.js"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.7.2",
+    "openai": "^6.3.0",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.2.2",
+    "@types/node": "^22.18.8",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
