@@ -11,17 +11,18 @@
     "test": "npm run build && node --test dist/test/*.test.js"
   },
   "dependencies": {
+    "@azure/data-tables": "^13.3.2",
     "@azure/functions": "^4.7.2",
     "openai": "^6.3.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "azure-functions-core-tools": "^4.2.2",
     "@types/node": "^22.18.8",
+    "azure-functions-core-tools": "^4.2.2",
     "rimraf": "^6.0.1",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
