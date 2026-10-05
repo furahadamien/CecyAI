@@ -477,7 +477,7 @@ curl --request POST 'https://cecyaiendpoints-gqdahecce6g7dufv.westus3-01.azurewe
 
 ## User Activity Registry
 
-The Function App also exposes protected endpoints for recording active and inactive Cecy accounts. These endpoints store no cycle, symptom, question, or AI-response data.
+The Function App also exposes endpoints for recording active and inactive Cecy accounts. These endpoints store no cycle, symptom, question, or AI-response data.
 
 Storage configuration:
 
@@ -486,14 +486,13 @@ Storage configuration:
 - Optional table-name setting: `USER_REGISTRY_TABLE_NAME`
 - The table is created automatically on first use
 
-Both endpoints use the Azure Functions `function` authorization level. Supply a function key through the `x-functions-key` header or the `code` query parameter. A Function key is a server credential and must not be embedded in a distributed mobile application.
+Both endpoints currently use the Azure Functions `anonymous` authorization level and require no key or token. This is suitable only for prototype use: any caller can create, reactivate, or deactivate a guessed user ID. Add user authentication and derive the user ID from a validated token before production use.
 
 Create or reactivate a user:
 
 ```http
 PUT /api/users/{userId}
 Content-Type: application/json
-x-functions-key: <function-key>
 
 {
   "displayName": "Jane Doe"
@@ -507,7 +506,6 @@ Mark a user inactive:
 ```http
 PATCH /api/users/{userId}/status
 Content-Type: application/json
-x-functions-key: <function-key>
 
 {
   "status": "inactive"
