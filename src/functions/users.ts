@@ -126,14 +126,14 @@ export async function deactivateUser(
 
 app.http("upsertUser", {
   methods: ["PUT"],
-  authLevel: "function",
+  authLevel: "anonymous",
   route: "users/{userId}",
   handler: upsertUser,
 });
 
 app.http("deactivateUser", {
   methods: ["PATCH"],
-  authLevel: "function",
+  authLevel: "anonymous",
   route: "users/{userId}/status",
   handler: deactivateUser,
 });
