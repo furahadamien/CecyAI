@@ -7,11 +7,12 @@ Audience: Cecy iOS implementation agent and backend maintainers
 
 - Repository: `/Users/furahadamien/Dev/CecyAI`
 - Branch: `feature/expanded-symptom-catalog`
-- Implementation commit: `e41fd57b5c32710eb16a97d6b12d989dbb477e98`
-- Commit message: `Add versioned expanded symptom catalog`
+- Base implementation commit: `e41fd57b5c32710eb16a97d6b12d989dbb477e98`
+- Deployed implementation revision: `44af85ec5675389142bc77aa97b7bc47196f1871`
+- Relevant commits: `Add versioned expanded symptom catalog`, `Clarify libido normalization semantics`
 - PR: not created
-- Push state: local branch only at handoff creation
-- Deployment state: implemented and locally validated; not deployed
+- Push state: pushed to `origin/feature/expanded-symptom-catalog`
+- Deployment state: deployed to production and verified on October 6, 2026
 - Implementation owner: GitHub Copilot working with the repository owner
 
 Implemented:
@@ -37,8 +38,6 @@ Deliberately unchanged:
 
 Deferred or blocked:
 
-- Live-model evaluation was not run because no approved staging model environment or owner approval was provided.
-- Production deployment requires explicit owner approval.
 - Provider retention configuration and Azure/Application Insights telemetry retention were not independently verified.
 - Authentication, quotas, raw-body edge limits, and abuse controls remain separate operational work.
 
@@ -262,7 +261,7 @@ The v1/v2 request-response fixtures are executed against request and final respo
 - Provider: OpenAI Responses API through the official Node SDK.
 - Production model setting verified October 6, 2026: `OPENAI_MODEL=gpt-6-luna`.
 - Model selection remains environment-controlled; it is not hardcoded in this change.
-- Prompt/schema revision: implementation commit `e41fd57b5c32710eb16a97d6b12d989dbb477e98`.
+- Prompt/schema revision: deployed commit `44af85ec5675389142bc77aa97b7bc47196f1871`.
 - Maximum model output: 1,200 tokens.
 - SDK timeout: 20 seconds.
 - SDK retries: at most 2 under the SDK policy.
@@ -297,17 +296,27 @@ Environment on October 6, 2026:
 - macOS
 - Node.js `v22.13.0`
 - npm `10.9.2`
-- Tested commit: `e41fd57b5c32710eb16a97d6b12d989dbb477e98`
+- Tested and deployed commit: `44af85ec5675389142bc77aa97b7bc47196f1871`
 
 Commands and results:
 
 ```text
-npm test              40 passed, 0 failed
+npm test              41 passed, 0 failed
 git diff --check      passed
 npm audit --omit=dev  0 vulnerabilities
 ```
 
-Automated tests use mocked task handlers. They do not call OpenAI or the deployed endpoint. Code review found no blocking code issue after fixes. Security review found no introduced security regression.
+Automated tests use mocked task handlers. Separate production verification used only checked-in synthetic fixtures against the deployed endpoint and configured model. Code review found no blocking code issue after fixes. Security review found no introduced security regression.
+
+Production verification on October 6, 2026:
+
+- All five v1 fixture requests returned HTTP 200 and schema-valid responses.
+- All five v2 fixture requests returned HTTP 200 and schema-valid responses.
+- Invalid catalog version returned HTTP 400 `INVALID_REQUEST`.
+- A headerless dizziness request returned an empty v1 result and did not leak a v2 code.
+- All 11 normalization evaluation cases passed after the libido prompt correction, covering all 39 codes, negation, specific-versus-umbrella behavior, low/high ratings, empty output, and adversarial text.
+- The severe-vomiting/peanut-allergy wellness fixture returned a non-null safety message with no detected peanut recommendation conflict.
+- Azure rediscovered `ai`, `upsertUser`, and `deactivateUser`; the Function host reported `Running`.
 
 Acceptance classification:
 
@@ -317,26 +326,24 @@ Acceptance classification:
 | CAT-02 Compatibility | PASS | Missing/explicit v1 and explicit v2 are tested; invalid versions fail; v1 rejects v2 request and response codes. |
 | CAT-03 Five operations | PASS | All 39 codes are accepted in each applicable validated field; cycle-only shapes remain supported; all task fixtures execute. |
 | CAT-04 Normalization | PASS | Empty arrays, uniqueness, nullable severity, versioned enums, 20/39 schema bounds, and malformed output rejection are implemented. |
-| CAT-05 Meaning | PARTIAL | Synthetic expected cases cover all codes, negation, overlap, rating semantics, and adversarial text. Run them against the approved deployed model before release. |
-| CAT-06 Safety | PARTIAL | Safety, allergy, diagnosis, cycle-attribution, and fact-fidelity rules are prompt-controlled. No approved live-model safety evaluation was run. |
+| CAT-05 Meaning | PASS | All 11 synthetic normalization evaluation cases passed against the deployed model, including all codes, negation, overlap, rating semantics, empty output, and adversarial text. This is contract evidence, not clinical accuracy evidence. |
+| CAT-06 Safety | PARTIAL | The deployed severe-vomiting/peanut-allergy case produced a safety message without a detected allergen conflict. Broader diagnosis, fertility, reassurance, and supplied-fact fidelity evaluation remains limited. |
 | CAT-07 Failure behavior | PARTIAL | Invalid input, oversized canonicalized payload, mocked outage, and malformed output are tested. Provider timeout/rate-limit behavior is documented but not integration-tested. |
 | CAT-08 Privacy/security | PARTIAL | Application logging and fixture hygiene were reviewed; no persistence was added. Provider retention and platform telemetry remain unverified; inherited abuse gaps remain. |
 | CAT-09 Client fixtures | PASS | Machine-readable v1/v2, mapping, error, and evaluation fixtures are delivered. |
-| CAT-10 Delivery | PARTIAL | Build/tests/audit/reviews are complete and rollback is documented. Branch is not pushed, no PR exists, and v2 is not deployed. |
+| CAT-10 Delivery | PASS | Build/tests/audit/reviews are complete, the branch is pushed, revision `44af85ec…` is deployed and verified, and rollback behavior is documented. No PR exists. |
 
 Known gaps:
 
-- No live-model semantic, adversarial, allergy, or severe-symptom evaluation.
-- No deployed v2 endpoint smoke test.
 - No actual provider timeout, throttling, or cancellation integration test.
 - No authentication, application rate limit, or raw-body edge guard.
 - Provider retention and Azure telemetry configuration not verified.
 
 ## F. Deployment and Rollback State
 
-Current state: implemented only. Catalog v2 is not deployed to staging or production.
+Current state: deployed to production. Revision `44af85ec5675389142bc77aa97b7bc47196f1871` was published with Azure remote build and verified at approximately 18:23 UTC on October 6, 2026.
 
-The existing production endpoint remains on the previously deployed contract. Do not enable the iOS v2 header in a distributed build until commit `e41fd57b5c32710eb16a97d6b12d989dbb477e98` or an reviewed descendant is deployed and verified.
+The production endpoint now supports the legacy v1 default and explicit catalog v2. The iOS app may integrate against this contract, but release acceptance still requires the updated client to be built and tested end to end.
 
 Approved deployment target only:
 
@@ -346,7 +353,7 @@ Resource group: cecy_rg
 Subscription: ebaccba8-c067-4eec-8cdf-778060822e83
 ```
 
-Deployment command after explicit owner approval:
+Deployment command used after owner approval:
 
 ```bash
 ./node_modules/.bin/func azure functionapp publish cecyaiendpoints \
@@ -355,7 +362,7 @@ Deployment command after explicit owner approval:
   --subscription ebaccba8-c067-4eec-8cdf-778060822e83
 ```
 
-Required deployment verification:
+Completed deployment verification:
 
 1. Confirm Azure discovers the existing `ai`, `upsertUser`, and `deactivateUser` triggers.
 2. Run only synthetic v1 and v2 fixtures against `/api/ai`.
@@ -391,6 +398,6 @@ No iOS health-store migration or symptom raw-value migration is expected.
 
 ## Final Readiness Answer
 
-The backend implementation is ready for iOS v2 client development against commit `e41fd57b5c32710eb16a97d6b12d989dbb477e98` and the contract/fixtures in `fixtures/symptom-catalog/`. It is not deployed anywhere, has not been pushed or opened as a PR, and is not yet release-verified.
+The backend is ready for iOS v2 integration against deployed commit `44af85ec5675389142bc77aa97b7bc47196f1871` and the contract/fixtures in `fixtures/symptom-catalog/`. It is deployed to the production Function App and supports both the legacy default and explicit v2 negotiation. The branch is pushed; no PR has been created.
 
-Before release, the owner must approve deployment, the exact reviewed revision must be deployed, v1/v2 endpoint smoke tests must pass, and the synthetic model-behavior and safety cases must be evaluated against the configured deployed model. End-to-end iOS integration remains incomplete until the updated app is built and tested against that verified deployment.
+Backend deployment and synthetic contract verification are complete. End-to-end release acceptance remains incomplete until the updated iOS client is built and tested against this production contract, and the inherited authentication, abuse-control, retention, and telemetry gaps are explicitly accepted or addressed.
