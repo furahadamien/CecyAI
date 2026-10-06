@@ -706,7 +706,7 @@ npm test
 npm audit --omit=dev
 ```
 
-The 40-test suite covers all five valid tasks, malformed values and JSON, catalog negotiation, all 39 v2 codes, v1 isolation, multi-symptom facts, rating nullability, duplicate output rejection, Unicode boundaries, executable fixtures, oversized arrays and bodies, OpenAI failures, invalid structured responses, and privacy-safe malformed-JSON logging.
+The 41-test suite covers all five valid tasks, malformed values and JSON, catalog negotiation, all 39 v2 codes, v1 isolation, multi-symptom facts, rating nullability, duplicate output rejection, Unicode boundaries, executable fixtures, oversized arrays and bodies, OpenAI failures, invalid structured responses, and privacy-safe malformed-JSON logging.
 
 Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is prompted but is not deterministically enforced by the schema.
 

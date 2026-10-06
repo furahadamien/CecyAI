@@ -8,6 +8,7 @@ import {
   SYMPTOM_CATALOG_HEADER,
   parseSymptomCatalogVersion,
 } from "../src/ai/symptomCatalog";
+import { taskInstructionsFor } from "../src/ai/systemInstructions";
 import { ai, processAIRequest } from "../src/functions/ai";
 import { validateAIRequest } from "../src/validation/requestValidation";
 
@@ -132,6 +133,13 @@ test("normalization requires null severity for rating observations", () => {
     assert.equal(schema.safeParse({ symptoms: [{ type, severity: null }] }).success, true);
     assert.equal(schema.safeParse({ symptoms: [{ type, severity: "severe" }] }).success, false);
   }
+});
+
+test("normalization instructions classify explicit sex-drive ratings for user review", () => {
+  const instructions = taskInstructionsFor("normalize_symptoms", 2);
+  assert.match(instructions, /low, typical, high, changed/);
+  assert.match(instructions, /return libido with null severity/);
+  assert.match(instructions, /low-only restriction applies to wellness request contexts/);
 });
 
 test("v2 accepts all 39 codes in wellness and cycle summaries", () => {

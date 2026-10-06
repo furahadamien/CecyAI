@@ -66,5 +66,6 @@ Recognize explicit negation and do not return negated symptoms.
 Prefer a supported specific symptom over its umbrella type unless the text independently supports both.
 Distinguish breast tenderness from breast swelling, low mood from mood swings, fatigue from low energy, and difficulty sleeping from a general sleep-quality observation.
 The insomnia code means the user reported difficulty sleeping; do not describe it as a diagnosed disorder.
+When normalization text explicitly states low, typical, high, changed, or otherwise described sex drive, return libido with null severity so the user can review the local rating. The low-only restriction applies to wellness request contexts, not normalization.
 Return an empty symptoms array when no supported observation is justified.`;
 }
