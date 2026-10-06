@@ -1,0 +1,128 @@
+{
+  "fixtureType": "mock_contract",
+  "catalogVersion": 2,
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "2"
+  },
+  "cases": [
+    {
+      "task": "normalize_symptoms",
+      "request": {
+        "task": "normalize_symptoms",
+        "context": {
+          "text": "I feel dizzy and noticed vaginal itching."
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "symptoms": [
+            { "type": "dizziness", "severity": null },
+            { "type": "vaginal_itching", "severity": null }
+          ]
+        }
+      }
+    },
+    {
+      "task": "explain_insight",
+      "request": {
+        "task": "explain_insight",
+        "context": {
+          "insightType": "symptom_timing",
+          "facts": {
+            "symptom": "libido",
+            "rating": "low",
+            "cyclesAnalyzed": 4,
+            "occurrences": 3
+          }
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "title": "Low sex-drive ratings appeared in the supplied records",
+          "explanation": "A low sex-drive rating was supplied in three of four cycles.",
+          "supportingObservation": "Three low ratings were supplied across four cycles.",
+          "safetyMessage": null
+        }
+      }
+    },
+    {
+      "task": "daily_wellness_recommendation",
+      "request": {
+        "task": "daily_wellness_recommendation",
+        "context": {
+          "symptoms": [
+            { "type": "libido", "severity": null },
+            { "type": "vomiting", "severity": "severe" }
+          ],
+          "activityLevel": "lightly_active",
+          "preferredExercises": ["walking"],
+          "dietaryPreference": "vegetarian",
+          "foodAllergies": ["peanuts"],
+          "userGoals": ["support_recovery"]
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "movementSuggestions": ["Rest rather than exercising while severe vomiting continues."],
+          "foodSuggestions": ["Choose tolerated foods that meet the supplied vegetarian and peanut-free needs."],
+          "hydrationSuggestion": "Take small, regular sips of fluid if tolerated.",
+          "recoverySuggestions": ["Prioritize rest."],
+          "explanation": "The suggestions prioritize the supplied severe vomiting.",
+          "safetyMessage": "Consider prompt medical advice for severe or persistent vomiting or signs of dehydration."
+        }
+      }
+    },
+    {
+      "task": "cycle_summary",
+      "request": {
+        "task": "cycle_summary",
+        "context": {
+          "periodLabel": "Synthetic recent cycle",
+          "cycleLength": 31,
+          "averageCycleLength": 30,
+          "periodLength": 5,
+          "commonSymptoms": ["brain_fog", "pelvic_pain", "bloating"],
+          "observations": ["Brain fog was recorded twice in the supplied cycle."]
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "summary": "The supplied cycle lasted 31 days with a five-day period.",
+          "highlights": ["Brain fog, pelvic pain, and bloating were supplied as common observations."],
+          "safetyMessage": null
+        }
+      }
+    },
+    {
+      "task": "answer_cycle_question",
+      "request": {
+        "task": "answer_cycle_question",
+        "context": {
+          "question": "Which supplied observations were most frequent?",
+          "facts": {
+            "symptoms": [
+              { "symptom": "brain_fog", "count": 4 },
+              { "symptom": "pelvic_pain", "count": 3 },
+              { "symptom": "oily_skin", "count": 1 }
+            ],
+            "cyclesAnalyzed": 6,
+            "caveat": "Counts describe recorded observations and do not establish a cause."
+          }
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "answer": "Brain fog was the most frequent observation in the supplied facts.",
+          "supportingFacts": ["Brain fog had four supplied occurrences, compared with three for pelvic pain and one for oily skin."],
+          "safetyMessage": null
+        }
+      }
+    }
+  ]
+}

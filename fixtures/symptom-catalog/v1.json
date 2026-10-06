@@ -1,0 +1,125 @@
+{
+  "fixtureType": "mock_contract",
+  "catalogVersion": 1,
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "1"
+  },
+  "cases": [
+    {
+      "task": "normalize_symptoms",
+      "request": {
+        "task": "normalize_symptoms",
+        "context": {
+          "text": "I feel tired and have mild cramps."
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "symptoms": [
+            { "type": "fatigue", "severity": null },
+            { "type": "cramps", "severity": "mild" }
+          ]
+        }
+      }
+    },
+    {
+      "task": "explain_insight",
+      "request": {
+        "task": "explain_insight",
+        "context": {
+          "insightType": "symptom_timing",
+          "facts": {
+            "symptom": "headache",
+            "cyclesAnalyzed": 6,
+            "occurrences": 4
+          }
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "title": "Headaches appeared in the supplied records",
+          "explanation": "The supplied records include headaches in four of six cycles.",
+          "supportingObservation": "Four headache occurrences were supplied across six cycles.",
+          "safetyMessage": null
+        }
+      }
+    },
+    {
+      "task": "daily_wellness_recommendation",
+      "request": {
+        "task": "daily_wellness_recommendation",
+        "context": {
+          "cycleDay": 2,
+          "symptoms": [
+            { "type": "cramps", "severity": "moderate" }
+          ],
+          "activityLevel": "lightly_active",
+          "preferredExercises": ["walking"],
+          "dietaryPreference": "none",
+          "foodAllergies": [],
+          "userGoals": ["manage_symptoms"]
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "movementSuggestions": ["Take a comfortable walk if it feels manageable."],
+          "foodSuggestions": ["Choose a balanced meal you tolerate well."],
+          "hydrationSuggestion": "Drink water regularly throughout the day.",
+          "recoverySuggestions": ["Allow time for rest."],
+          "explanation": "These suggestions account for the supplied moderate cramps.",
+          "safetyMessage": null
+        }
+      }
+    },
+    {
+      "task": "cycle_summary",
+      "request": {
+        "task": "cycle_summary",
+        "context": {
+          "periodLabel": "Synthetic recent cycle",
+          "cycleLength": 30,
+          "averageCycleLength": 29,
+          "periodLength": 5,
+          "commonSymptoms": ["fatigue", "cramps"],
+          "observations": ["Fatigue was recorded before the period."]
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "summary": "The supplied cycle lasted 30 days with a five-day period.",
+          "highlights": ["Fatigue and cramps were supplied as common symptoms."],
+          "safetyMessage": null
+        }
+      }
+    },
+    {
+      "task": "answer_cycle_question",
+      "request": {
+        "task": "answer_cycle_question",
+        "context": {
+          "question": "Which supplied symptom was more common?",
+          "facts": {
+            "symptoms": [
+              { "symptom": "headache", "count": 4 },
+              { "symptom": "cramps", "count": 2 }
+            ],
+            "cyclesAnalyzed": 6
+          }
+        }
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "answer": "Headache was recorded more often in the supplied facts.",
+          "supportingFacts": ["Headache had four supplied occurrences and cramps had two."],
+          "safetyMessage": null
+        }
+      }
+    }
+  ]
+}

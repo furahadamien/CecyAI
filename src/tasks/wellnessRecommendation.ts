@@ -3,15 +3,17 @@ import {
   DailyWellnessRecommendationSchema,
   type DailyWellnessRecommendation,
 } from "../ai/schemas";
-import { TASK_INSTRUCTIONS } from "../ai/systemInstructions";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
+import { taskInstructionsFor } from "../ai/systemInstructions";
 
 export async function wellnessRecommendation(
   context: unknown,
+  catalogVersion: SymptomCatalogVersion,
 ): Promise<DailyWellnessRecommendation> {
   return requestStructuredOutput({
     context,
-    instructions: TASK_INSTRUCTIONS.daily_wellness_recommendation,
+    instructions: taskInstructionsFor("daily_wellness_recommendation", catalogVersion),
     schema: DailyWellnessRecommendationSchema,
-    schemaName: "daily_wellness_recommendation",
+    schemaName: `daily_wellness_recommendation_v${catalogVersion}`,
   });
 }

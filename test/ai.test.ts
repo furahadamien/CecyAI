@@ -170,6 +170,7 @@ test("rejects a malformed request", async () => {
 test("rejects malformed JSON at the HTTP boundary without logging parser details", async () => {
   const logs: string[] = [];
   const request = {
+    headers: new Headers(),
     json: async () => {
       throw new SyntaxError("private parser detail");
     },

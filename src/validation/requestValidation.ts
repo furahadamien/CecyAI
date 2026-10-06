@@ -1,10 +1,11 @@
 import {
-  AnswerCycleQuestionContextSchema,
-  CycleSummaryContextSchema,
-  DailyWellnessContextSchema,
-  ExplainInsightContextSchema,
   NormalizeSymptomsContextSchema,
+  createAnswerCycleQuestionContextSchema,
+  createCycleSummaryContextSchema,
+  createDailyWellnessContextSchema,
+  createExplainInsightContextSchema,
 } from "../ai/schemas";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
 import type { AITaskName } from "../ai/systemInstructions";
 import type { AIRequest } from "../models/AIRequest";
 
@@ -43,7 +44,10 @@ function invalidContext(task: AITaskName, issuePath: PropertyKey[]): ValidationR
   };
 }
 
-export function validateAIRequest(body: unknown): ValidationResult {
+export function validateAIRequest(
+  body: unknown,
+  catalogVersion: SymptomCatalogVersion = 1,
+): ValidationResult {
   if (!isRecord(body)) {
     return { success: false, code: "INVALID_REQUEST", message: "task is required" };
   }
@@ -72,31 +76,46 @@ export function validateAIRequest(body: unknown): ValidationResult {
     case "normalize_symptoms": {
       const result = NormalizeSymptomsContextSchema.safeParse(body.context);
       return result.success
-        ? { success: true, data: { task: body.task, context: result.data } }
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
         : invalidContext(body.task, result.error.issues[0]?.path ?? []);
     }
     case "explain_insight": {
-      const result = ExplainInsightContextSchema.safeParse(body.context);
+      const result = createExplainInsightContextSchema(catalogVersion).safeParse(body.context);
       return result.success
-        ? { success: true, data: { task: body.task, context: result.data } }
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
         : invalidContext(body.task, result.error.issues[0]?.path ?? []);
     }
     case "daily_wellness_recommendation": {
-      const result = DailyWellnessContextSchema.safeParse(body.context);
+      const result = createDailyWellnessContextSchema(catalogVersion).safeParse(body.context);
       return result.success
-        ? { success: true, data: { task: body.task, context: result.data } }
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
         : invalidContext(body.task, result.error.issues[0]?.path ?? []);
     }
     case "cycle_summary": {
-      const result = CycleSummaryContextSchema.safeParse(body.context);
+      const result = createCycleSummaryContextSchema(catalogVersion).safeParse(body.context);
       return result.success
-        ? { success: true, data: { task: body.task, context: result.data } }
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
         : invalidContext(body.task, result.error.issues[0]?.path ?? []);
     }
     case "answer_cycle_question": {
-      const result = AnswerCycleQuestionContextSchema.safeParse(body.context);
+      const result = createAnswerCycleQuestionContextSchema(catalogVersion).safeParse(body.context);
       return result.success
-        ? { success: true, data: { task: body.task, context: result.data } }
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
         : invalidContext(body.task, result.error.issues[0]?.path ?? []);
     }
   }

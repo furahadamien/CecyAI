@@ -1,12 +1,16 @@
 import { requestStructuredOutput } from "../ai/openAIClient";
 import { CycleSummarySchema, type CycleSummary } from "../ai/schemas";
-import { TASK_INSTRUCTIONS } from "../ai/systemInstructions";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
+import { taskInstructionsFor } from "../ai/systemInstructions";
 
-export async function cycleSummary(context: unknown): Promise<CycleSummary> {
+export async function cycleSummary(
+  context: unknown,
+  catalogVersion: SymptomCatalogVersion,
+): Promise<CycleSummary> {
   return requestStructuredOutput({
     context,
-    instructions: TASK_INSTRUCTIONS.cycle_summary,
+    instructions: taskInstructionsFor("cycle_summary", catalogVersion),
     schema: CycleSummarySchema,
-    schemaName: "cycle_summary",
+    schemaName: `cycle_summary_v${catalogVersion}`,
   });
 }

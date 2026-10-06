@@ -1,15 +1,19 @@
 import { requestStructuredOutput } from "../ai/openAIClient";
 import {
-  NormalizedSymptomsSchema,
+  createNormalizedSymptomsSchema,
   type NormalizedSymptoms,
 } from "../ai/schemas";
-import { TASK_INSTRUCTIONS } from "../ai/systemInstructions";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
+import { taskInstructionsFor } from "../ai/systemInstructions";
 
-export async function normalizeSymptoms(context: unknown): Promise<NormalizedSymptoms> {
+export async function normalizeSymptoms(
+  context: unknown,
+  catalogVersion: SymptomCatalogVersion,
+): Promise<NormalizedSymptoms> {
   return requestStructuredOutput({
     context,
-    instructions: TASK_INSTRUCTIONS.normalize_symptoms,
-    schema: NormalizedSymptomsSchema,
-    schemaName: "normalized_symptoms",
+    instructions: taskInstructionsFor("normalize_symptoms", catalogVersion),
+    schema: createNormalizedSymptomsSchema(catalogVersion),
+    schemaName: `normalized_symptoms_v${catalogVersion}`,
   });
 }
