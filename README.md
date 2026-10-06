@@ -9,6 +9,7 @@ The service does not store user health data and is not the source of truth for c
 - Method: `POST`
 - URL: `https://cecyaiendpoints-gqdahecce6g7dufv.westus3-01.azurewebsites.net/api/ai`
 - Header: `Content-Type: application/json`
+- Optional header: `X-Cecy-Symptom-Catalog-Version: 1|2`
 - Authorization: Anonymous; no key or token is currently required
 - Application rate limiting: Not implemented
 - Parsed JSON limit: 32 KiB after canonicalization with `JSON.stringify()`
@@ -95,6 +96,14 @@ Error:
 
 Task context objects are strict and reject unknown fields. Unknown top-level request fields are ignored. Model-generated wording in the examples below is illustrative; response field names, types, nullability, and limits are contractual.
 
+Symptom catalog negotiation:
+
+- Missing header or value `1`: legacy 13-code catalog.
+- Value `2`: expanded 39-code catalog.
+- Any other value, including whitespace-padded values, returns HTTP `400` with `INVALID_REQUEST`.
+- Version negotiation applies to every symptom-bearing request field, model instruction, normalization output schema, and final server-side response validation.
+- A v1 client can never receive a v2-only normalized symptom code.
+
 ## 1. Normalize Symptoms
 
 Converts natural-language text into Cecy's approved symptom taxonomy. It does not diagnose conditions or provide treatment.
@@ -137,11 +146,13 @@ Response:
 Input and output limits:
 
 - `context.text`: required, 1 to 2,000 characters
-- At most 20 symptoms are returned
+- At most 20 symptoms are returned for v1 and 39 for v2
+- Normalized symptom types must be unique
 - Severity: `mild`, `moderate`, `severe`, or `null`
 - Severity is inferred only when supported by the wording
+- `sleep_change`, `low_energy`, and `libido` always use `null` severity because they are rating observations
 
-Allowed symptom types:
+Version 1 symptom types:
 
 ```text
 cramps
@@ -158,6 +169,39 @@ sleep_change
 low_energy
 digestive_change
 ```
+
+Version 2 includes every v1 type plus:
+
+```text
+pelvic_pain
+joint_pain
+muscle_aches
+breast_swelling
+anxiety
+irritability
+low_mood
+mood_swings
+difficulty_concentrating
+brain_fog
+insomnia
+dizziness
+constipation
+diarrhea
+appetite_changes
+vomiting
+oily_skin
+dry_skin
+hair_changes
+hot_flashes
+night_sweats
+discharge_changes
+vaginal_dryness
+vaginal_itching
+urinary_discomfort
+libido
+```
+
+`insomnia` means reported difficulty sleeping, not a diagnosed disorder. In wellness contexts, `libido` represents an explicitly low local rating. Categories are presentation metadata and are not request or response fields.
 
 ## 2. Explain Insight
 
@@ -273,8 +317,8 @@ Input limits:
 
 - `cycleDay`: optional integer from 1 to 100
 - `estimatedPhase`: optional, 1 to 80 characters
-- `symptoms`: required, at most 20 entries
-- Symptom `type`: 1 to 80 characters
+- `symptoms`: required, at most 20 entries in v1 and 39 in v2
+- Symptom `type`: a code allowed by the negotiated catalog version
 - Symptom severity: `mild`, `moderate`, `severe`, or `null`
 - `activityLevel`: required, 1 to 80 characters
 - `dietaryPreference`: required, 1 to 100 characters
@@ -318,7 +362,7 @@ Severe-symptom safety test:
 }
 ```
 
-The intended behavior is cautious guidance, no intense activity, and a non-null safety message suggesting professional evaluation. This is server-prompted and production-smoke-tested, but not a schema-level guarantee because the response schema permits `safetyMessage: null`.
+The intended behavior is cautious guidance, no intense activity, and a non-null safety message suggesting professional evaluation. This behavior was smoke-tested for the earlier production contract, but catalog-v2 model behavior has not been live-tested. It is not a schema-level guarantee because the response schema permits `safetyMessage: null`.
 
 ## 4. Cycle Summary
 
@@ -367,7 +411,7 @@ Limits:
 - `cycleLength`: integer from 1 to 100
 - `averageCycleLength`: finite number from 1 to 100
 - `periodLength`: integer from 1 to 30
-- `commonSymptoms`: at most 20 entries, each 1 to 200 characters
+- `commonSymptoms`: negotiated symptom codes; at most 20 entries in v1 and 39 in v2
 - `observations`: at most 30 entries, each 1 to 500 characters
 - `summary`: 1 to 1,200 characters
 - `highlights`: zero to eight entries, each 1 to 300 characters
@@ -585,12 +629,15 @@ Important files:
 
 - `src/functions/ai.ts`: HTTP registration, response wrapper, error mapping, and operational logging
 - `src/validation/requestValidation.ts`: Request-size guard and task-specific validation
+- `src/ai/symptomCatalog.ts`: Canonical version negotiation and 13/39-code catalogs
 - `src/ai/taskRouter.ts`: Extensible routing and final output validation
 - `src/ai/openAIClient.ts`: Reusable OpenAI client, timeout, retries, and structured parsing
 - `src/ai/systemInstructions.ts`: Shared safety and task instructions
 - `src/ai/schemas.ts`: Input and output contracts
 - `src/tasks/`: Task-specific OpenAI handlers
 - `test/ai.test.ts`: Contract and failure tests
+- `test/symptomCatalog.test.ts`: Catalog compatibility, limits, semantics, and Unicode tests
+- `fixtures/symptom-catalog/`: Machine-readable v1/v2 examples, mappings, errors, and evaluation cases
 - `HANDOFF.md`: Detailed engineering and operational handoff
 
 ## OpenAI Integration
@@ -659,9 +706,9 @@ npm test
 npm audit --omit=dev
 ```
 
-The 14-test suite covers all five valid tasks, malformed values and JSON, unsupported tasks, missing context, invalid `normalize_symptoms` context, oversized arrays and bodies, OpenAI failures, invalid structured responses, and privacy-safe malformed-JSON logging.
+The 41-test suite covers all five valid tasks, malformed values and JSON, catalog negotiation, all 39 v2 codes, v1 isolation, multi-symptom facts, rating nullability, duplicate output rejection, Unicode boundaries, executable fixtures, oversized arrays and bodies, OpenAI failures, invalid structured responses, and privacy-safe malformed-JSON logging.
 
-Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. Severe-symptom safety behavior is prompted and production-smoke-tested, but is not deterministically enforced by the schema.
+Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is prompted but is not deterministically enforced by the schema.
 
 ## Deployment
 

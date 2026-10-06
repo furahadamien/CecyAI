@@ -1,0 +1,40 @@
+{
+  "errors": [
+    {
+      "id": "invalid-catalog-version",
+      "requestHeader": { "X-Cecy-Symptom-Catalog-Version": "3" },
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "INVALID_REQUEST", "message": "X-Cecy-Symptom-Catalog-Version must be 1 or 2" } }
+    },
+    {
+      "id": "unsupported-task",
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "UNSUPPORTED_TASK", "message": "task is not supported" } }
+    },
+    {
+      "id": "unknown-symptom-input",
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "INVALID_REQUEST", "message": "context.symptoms.0.type is invalid for task daily_wellness_recommendation" } }
+    },
+    {
+      "id": "invalid-model-output",
+      "httpStatus": 502,
+      "response": { "success": false, "error": { "code": "AI_RESPONSE_INVALID", "message": "AI response was invalid" } }
+    },
+    {
+      "id": "provider-rate-limit",
+      "httpStatus": 502,
+      "response": { "success": false, "error": { "code": "AI_UNAVAILABLE", "message": "AI service is unavailable" } }
+    },
+    {
+      "id": "provider-timeout",
+      "httpStatus": 502,
+      "response": { "success": false, "error": { "code": "AI_UNAVAILABLE", "message": "AI service is unavailable" } }
+    },
+    {
+      "id": "oversized-request",
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "INVALID_REQUEST", "message": "request body is too large" } }
+    }
+  ]
+}

@@ -1,21 +1,24 @@
-import { z } from "zod";
-import {
-  AnswerCycleQuestionContextSchema,
-  CycleSummaryContextSchema,
-  DailyWellnessContextSchema,
-  ExplainInsightContextSchema,
-  NormalizeSymptomsContextSchema,
+import type {
+  AnswerCycleQuestionContext,
+  CycleSummaryContext,
+  DailyWellnessContext,
+  ExplainInsightContext,
 } from "../ai/schemas";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
+
+type BaseAIRequest = { catalogVersion: SymptomCatalogVersion };
 
 export type AIRequest =
-  | { task: "normalize_symptoms"; context: z.infer<typeof NormalizeSymptomsContextSchema> }
-  | { task: "explain_insight"; context: z.infer<typeof ExplainInsightContextSchema> }
+  | (BaseAIRequest & { task: "normalize_symptoms"; context: { text: string } })
+  | (BaseAIRequest & { task: "explain_insight"; context: ExplainInsightContext })
   | {
+      catalogVersion: SymptomCatalogVersion;
       task: "daily_wellness_recommendation";
-      context: z.infer<typeof DailyWellnessContextSchema>;
+      context: DailyWellnessContext;
     }
-  | { task: "cycle_summary"; context: z.infer<typeof CycleSummaryContextSchema> }
+  | (BaseAIRequest & { task: "cycle_summary"; context: CycleSummaryContext })
   | {
+      catalogVersion: SymptomCatalogVersion;
       task: "answer_cycle_question";
-      context: z.infer<typeof AnswerCycleQuestionContextSchema>;
+      context: AnswerCycleQuestionContext;
     };

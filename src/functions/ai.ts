@@ -1,5 +1,10 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { AIResponseInvalidError, AIUnavailableError } from "../ai/openAIClient";
+import {
+  parseSymptomCatalogVersion,
+  SYMPTOM_CATALOG_HEADER,
+  type SymptomCatalogVersion,
+} from "../ai/symptomCatalog";
 import { routeTask, type TaskDependencies } from "../ai/taskRouter";
 import type { AIErrorCode, AIErrorResponse } from "../models/AIResponse";
 import { isSupportedTask, validateAIRequest } from "../validation/requestValidation";
@@ -23,8 +28,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export async function processAIRequest(
   body: unknown,
   dependencies: Partial<TaskDependencies> = {},
+  catalogVersion: SymptomCatalogVersion = 1,
 ): Promise<HttpResponseInit> {
-  const validation = validateAIRequest(body);
+  const validation = validateAIRequest(body, catalogVersion);
   if (!validation.success) {
     return errorResponse(400, validation.code, validation.message);
   }
@@ -49,19 +55,25 @@ export async function processAIRequest(
 export async function ai(
   request: HttpRequest,
   context: InvocationContext,
+  dependencies: Partial<TaskDependencies> = {},
 ): Promise<HttpResponseInit> {
   const startedAt = Date.now();
   let task = "unknown";
   let response: HttpResponseInit;
 
-  try {
-    const body: unknown = await request.json();
-    if (isRecord(body) && typeof body.task === "string") {
-      task = isSupportedTask(body.task) ? body.task : "unsupported";
+  const catalog = parseSymptomCatalogVersion(request.headers.get(SYMPTOM_CATALOG_HEADER));
+  if (!catalog.success) {
+    response = errorResponse(400, "INVALID_REQUEST", catalog.message);
+  } else {
+    try {
+      const body: unknown = await request.json();
+      if (isRecord(body) && typeof body.task === "string") {
+        task = isSupportedTask(body.task) ? body.task : "unsupported";
+      }
+      response = await processAIRequest(body, dependencies, catalog.version);
+    } catch {
+      response = errorResponse(400, "INVALID_REQUEST", "Request body must be valid JSON");
     }
-    response = await processAIRequest(body);
-  } catch {
-    response = errorResponse(400, "INVALID_REQUEST", "Request body must be valid JSON");
   }
 
   context.log(

@@ -1,12 +1,16 @@
 import { requestStructuredOutput } from "../ai/openAIClient";
 import { ExplainInsightSchema, type ExplainInsight } from "../ai/schemas";
-import { TASK_INSTRUCTIONS } from "../ai/systemInstructions";
+import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
+import { taskInstructionsFor } from "../ai/systemInstructions";
 
-export async function explainInsight(context: unknown): Promise<ExplainInsight> {
+export async function explainInsight(
+  context: unknown,
+  catalogVersion: SymptomCatalogVersion,
+): Promise<ExplainInsight> {
   return requestStructuredOutput({
     context,
-    instructions: TASK_INSTRUCTIONS.explain_insight,
+    instructions: taskInstructionsFor("explain_insight", catalogVersion),
     schema: ExplainInsightSchema,
-    schemaName: "explained_insight",
+    schemaName: `explained_insight_v${catalogVersion}`,
   });
 }
