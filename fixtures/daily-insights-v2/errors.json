@@ -1,0 +1,40 @@
+{
+  "fixtureType": "controlled_failures",
+  "cases": [
+    {
+      "id": "invalid-request",
+      "catalogVersion": 2,
+      "request": { "task": "daily_insights_v2", "context": { "schemaVersion": 2 } },
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "INVALID_REQUEST", "message": "context.cycleDay is invalid for task daily_insights_v2" } }
+    },
+    {
+      "id": "missing-v2-header",
+      "catalogVersion": 1,
+      "request": { "task": "daily_insights_v2", "context": {} },
+      "httpStatus": 400,
+      "response": { "success": false, "error": { "code": "INVALID_REQUEST", "message": "daily_insights_v2 requires X-Cecy-Symptom-Catalog-Version 2" } }
+    },
+    {
+      "id": "provider-throttling",
+      "simulation": "AIUnavailableError",
+      "httpStatus": 502,
+      "retryable": true,
+      "response": { "success": false, "error": { "code": "AI_UNAVAILABLE", "message": "AI service is unavailable" } }
+    },
+    {
+      "id": "provider-timeout",
+      "simulation": "AIUnavailableError",
+      "httpStatus": 502,
+      "retryable": true,
+      "response": { "success": false, "error": { "code": "AI_UNAVAILABLE", "message": "AI service is unavailable" } }
+    },
+    {
+      "id": "upstream-unavailability",
+      "simulation": "AIUnavailableError",
+      "httpStatus": 502,
+      "retryable": true,
+      "response": { "success": false, "error": { "code": "AI_UNAVAILABLE", "message": "AI service is unavailable" } }
+    }
+  ]
+}

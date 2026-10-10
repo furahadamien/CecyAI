@@ -1,6 +1,7 @@
 import type {
   AnswerCycleQuestionContext,
   CycleSummaryContext,
+  DailyInsightsV2Context,
   DailyWellnessContext,
   ExplainInsightContext,
 } from "../ai/schemas";
@@ -16,6 +17,7 @@ export type AIRequest =
       task: "daily_wellness_recommendation";
       context: DailyWellnessContext;
     }
+  | (BaseAIRequest & { task: "daily_insights_v2"; context: DailyInsightsV2Context })
   | (BaseAIRequest & { task: "cycle_summary"; context: CycleSummaryContext })
   | {
       catalogVersion: SymptomCatalogVersion;

@@ -1,0 +1,42 @@
+{
+  "fixtureType": "mock_contract",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "2"
+  },
+  "request": {
+    "task": "daily_insights_v2",
+    "context": {
+      "schemaVersion": 2,
+      "cycleDay": null,
+      "phase": {
+        "value": null,
+        "basis": "unknown",
+        "limitations": ["cycle_day_unavailable", "insufficient_cycle_history"]
+      },
+      "symptoms": [],
+      "dailyBleeding": null,
+      "preferences": {
+        "activityLevel": null,
+        "preferredExercises": null,
+        "dietaryPreference": null,
+        "foodAllergies": null,
+        "userGoals": null
+      },
+      "requestedSections": ["self_care", "hydration", "skincare"]
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "schemaVersion": 2,
+      "sections": [
+        { "kind": "self_care", "status": "available", "suggestions": ["Choose one comfortable activity that helps you slow down today."], "unavailableReason": null },
+        { "kind": "hydration", "status": "available", "suggestions": ["Drink water regularly based on thirst and routine."], "unavailableReason": null },
+        { "kind": "skincare", "status": "available", "suggestions": ["Keep care simple with a gentle cleanser and plain moisturizer."], "unavailableReason": null }
+      ],
+      "explanation": "Cycle timing and symptoms were not supplied, so these are general low-risk options rather than phase-based guidance.",
+      "safetyMessage": null
+    }
+  }
+}

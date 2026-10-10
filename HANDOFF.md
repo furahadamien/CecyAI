@@ -36,7 +36,7 @@ There is one API endpoint. The `task` property selects one of five capabilities.
 - Authorization: Anonymous; no function key or bearer token is required
 - Clients should send: `Content-Type: application/json`
 - Application quotas and rate limiting: Not implemented
-- Parsed JSON limit: 32 KiB after `JSON.stringify()` canonicalization; this is not a raw HTTP-body byte limit
+- Request limit: 32 KiB of raw bytes before UTF-8 decoding and JSON parsing, followed by a canonicalized parsed-JSON check
 
 The endpoint is publicly reachable. Treat the URL as an unauthenticated prototype API until future hardening is implemented.
 

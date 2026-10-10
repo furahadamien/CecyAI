@@ -36,9 +36,9 @@ test("rejects an unsupported catalog header before parsing the body", async () =
   let parsedBody = false;
   const request = {
     headers: new Headers([[SYMPTOM_CATALOG_HEADER, "3"]]),
-    json: async () => {
+    arrayBuffer: async () => {
       parsedBody = true;
-      return {};
+      return new ArrayBuffer(0);
     },
   } as unknown as HttpRequest;
   const context = { log: () => undefined } as unknown as InvocationContext;
@@ -59,10 +59,13 @@ test("rejects an unsupported catalog header before parsing the body", async () =
 test("passes an explicit v2 HTTP header through to the task handler", async () => {
   const request = {
     headers: new Headers([[SYMPTOM_CATALOG_HEADER, "2"]]),
-    json: async () => ({
-      task: "normalize_symptoms",
-      context: { text: "I feel dizzy" },
-    }),
+    arrayBuffer: async () =>
+      new TextEncoder().encode(
+        JSON.stringify({
+          task: "normalize_symptoms",
+          context: { text: "I feel dizzy" },
+        }),
+      ).buffer,
   } as unknown as HttpRequest;
   const context = { log: () => undefined } as unknown as InvocationContext;
   let receivedVersion: number | undefined;

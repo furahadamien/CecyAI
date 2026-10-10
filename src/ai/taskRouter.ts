@@ -1,7 +1,9 @@
 import { AIResponseInvalidError } from "./openAIClient";
+import { dailyInsightsOutputIsAllowed } from "./dailyInsightsPolicy";
 import {
   CycleQuestionAnswerSchema,
   CycleSummarySchema,
+  DailyInsightsV2Schema,
   DailyWellnessRecommendationSchema,
   ExplainInsightSchema,
   createNormalizedSymptomsSchema,
@@ -10,6 +12,7 @@ import type { SymptomCatalogVersion } from "./symptomCatalog";
 import type { AIRequest } from "../models/AIRequest";
 import { answerCycleQuestion } from "../tasks/answerCycleQuestion";
 import { cycleSummary } from "../tasks/cycleSummary";
+import { dailyInsightsV2 } from "../tasks/dailyInsightsV2";
 import { explainInsight } from "../tasks/explainInsight";
 import { normalizeSymptoms } from "../tasks/normalizeSymptoms";
 import { wellnessRecommendation } from "../tasks/wellnessRecommendation";
@@ -23,6 +26,7 @@ export interface TaskDependencies {
   normalizeSymptoms: TaskHandler;
   explainInsight: TaskHandler;
   wellnessRecommendation: TaskHandler;
+  dailyInsightsV2: TaskHandler;
   cycleSummary: TaskHandler;
   answerCycleQuestion: TaskHandler;
 }
@@ -31,6 +35,7 @@ const defaultDependencies: TaskDependencies = {
   normalizeSymptoms,
   explainInsight,
   wellnessRecommendation,
+  dailyInsightsV2,
   cycleSummary,
   answerCycleQuestion,
 };
@@ -56,6 +61,18 @@ export async function routeTask(
       output = await dependencies.wellnessRecommendation(request.context, request.catalogVersion);
       result = DailyWellnessRecommendationSchema.safeParse(output);
       break;
+    case "daily_insights_v2": {
+      output = await dependencies.dailyInsightsV2(request.context, request.catalogVersion);
+      const dailyInsightsResult = DailyInsightsV2Schema.safeParse(output);
+      if (
+        dailyInsightsResult.success &&
+        !dailyInsightsOutputIsAllowed(request.context, dailyInsightsResult.data)
+      ) {
+        throw new AIResponseInvalidError("OpenAI returned an invalid response");
+      }
+      result = dailyInsightsResult;
+      break;
+    }
     case "cycle_summary":
       output = await dependencies.cycleSummary(request.context, request.catalogVersion);
       result = CycleSummarySchema.safeParse(output);

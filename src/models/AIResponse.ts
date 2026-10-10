@@ -1,6 +1,7 @@
 import type {
   CycleQuestionAnswer,
   CycleSummary,
+  DailyInsightsV2,
   DailyWellnessRecommendation,
   ExplainInsight,
   NormalizedSymptoms,
@@ -10,6 +11,7 @@ export type AIResponseData =
   | NormalizedSymptoms
   | ExplainInsight
   | DailyWellnessRecommendation
+  | DailyInsightsV2
   | CycleSummary
   | CycleQuestionAnswer;
 

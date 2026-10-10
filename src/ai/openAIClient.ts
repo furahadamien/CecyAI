@@ -16,6 +16,7 @@ interface StructuredOutputRequest<T> {
   instructions: string;
   schema: z.ZodType<T>;
   schemaName: string;
+  maxRetries?: number;
 }
 
 let openAIClient: OpenAI | undefined;
@@ -54,21 +55,25 @@ export async function requestStructuredOutput<T>({
   instructions,
   schema,
   schemaName,
+  maxRetries,
 }: StructuredOutputRequest<T>): Promise<T> {
   const { apiKey, model } = getAIConfiguration();
   const client = getOpenAIClient(apiKey);
 
   let parsed: unknown;
   try {
-    const response = await client.responses.parse({
-      model,
-      instructions: `${COMMON_SAFETY_INSTRUCTIONS}\n\n${instructions}`,
-      input: JSON.stringify(context),
-      max_output_tokens: 1_200,
-      text: {
-        format: zodTextFormat(schema, schemaName),
+    const response = await client.responses.parse(
+      {
+        model,
+        instructions: `${COMMON_SAFETY_INSTRUCTIONS}\n\n${instructions}`,
+        input: JSON.stringify(context),
+        max_output_tokens: 1_200,
+        text: {
+          format: zodTextFormat(schema, schemaName),
+        },
       },
-    });
+      { maxRetries },
+    );
     parsed = response.output_parsed;
   } catch (error) {
     if (isOpenAIServiceError(error)) {
