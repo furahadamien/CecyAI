@@ -1,0 +1,55 @@
+{
+  "fixtureType": "mock_contract",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "2"
+  },
+  "request": {
+    "task": "daily_insights_v2",
+    "context": {
+      "schemaVersion": 2,
+      "cycleDay": 2,
+      "phase": {
+        "value": "menstrual",
+        "basis": "recorded_bleeding",
+        "limitations": []
+      },
+      "symptoms": [
+        { "type": "cramps", "severity": "moderate" },
+        { "type": "fatigue", "severity": null }
+      ],
+      "dailyBleeding": { "state": "bleeding", "flow": "moderate" },
+      "preferences": {
+        "activityLevel": "moderately_active",
+        "preferredExercises": ["walking", "yoga"],
+        "dietaryPreference": "vegetarian",
+        "foodAllergies": ["Peanuts"],
+        "userGoals": ["manage_symptoms", "stay_active"]
+      },
+      "requestedSections": [
+        "self_care",
+        "food",
+        "movement",
+        "hydration",
+        "recovery",
+        "skincare"
+      ]
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "schemaVersion": 2,
+      "sections": [
+        { "kind": "self_care", "status": "available", "suggestions": ["Use a warm compress if it feels comfortable."], "unavailableReason": null },
+        { "kind": "food", "status": "available", "suggestions": ["Choose a lentil and rice bowl made from ingredients you already trust."], "unavailableReason": null },
+        { "kind": "movement", "status": "available", "suggestions": ["Take a gentle walk if your energy allows."], "unavailableReason": null },
+        { "kind": "hydration", "status": "available", "suggestions": ["Drink water regularly through the day."], "unavailableReason": null },
+        { "kind": "recovery", "status": "available", "suggestions": ["Plan a quieter evening and allow extra rest."], "unavailableReason": null },
+        { "kind": "skincare", "status": "available", "suggestions": ["Use a gentle cleanser and plain moisturizer."], "unavailableReason": null }
+      ],
+      "explanation": "These options prioritize the supplied cramps, fatigue, and preferences.",
+      "safetyMessage": null
+    }
+  }
+}

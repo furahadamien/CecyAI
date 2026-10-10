@@ -7,7 +7,11 @@ import {
 } from "../ai/symptomCatalog";
 import { routeTask, type TaskDependencies } from "../ai/taskRouter";
 import type { AIErrorCode, AIErrorResponse } from "../models/AIResponse";
-import { isSupportedTask, validateAIRequest } from "../validation/requestValidation";
+import {
+  isSupportedTask,
+  MAX_REQUEST_BYTES,
+  validateAIRequest,
+} from "../validation/requestValidation";
 
 function errorResponse(
   status: number,
@@ -66,7 +70,15 @@ export async function ai(
     response = errorResponse(400, "INVALID_REQUEST", catalog.message);
   } else {
     try {
-      const body: unknown = await request.json();
+      const rawBody = await request.arrayBuffer();
+      if (rawBody.byteLength > MAX_REQUEST_BYTES) {
+        response = errorResponse(400, "INVALID_REQUEST", "request body is too large");
+        context.log(
+          `task=${task} status=${response.status ?? 200} durationMs=${Date.now() - startedAt}`,
+        );
+        return response;
+      }
+      const body: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rawBody));
       if (isRecord(body) && typeof body.task === "string") {
         task = isSupportedTask(body.task) ? body.task : "unsupported";
       }

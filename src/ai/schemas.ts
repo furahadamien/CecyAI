@@ -179,6 +179,227 @@ export function createDailyWellnessContextSchema(version: SymptomCatalogVersion)
     .strict();
 }
 
+export const DailyInsightSectionKinds = [
+  "self_care",
+  "food",
+  "movement",
+  "hydration",
+  "recovery",
+  "skincare",
+] as const;
+
+export const PhaseLimitationCodes = [
+  "cycle_day_unavailable",
+  "insufficient_cycle_history",
+  "irregular_cycle",
+  "overdue_period",
+  "phase_boundary_uncertain",
+  "conflicting_evidence",
+] as const;
+
+const DailyInsightsPreferencesSchema = z
+  .object({
+    activityLevel: z.enum(["beginner", "moderately_active", "very_active"]).nullable(),
+    preferredExercises: z
+      .array(
+        z.enum([
+          "walking",
+          "running",
+          "strength_training",
+          "cycling",
+          "yoga",
+          "pilates",
+          "swimming",
+          "sports",
+          "home_workouts",
+        ]),
+      )
+      .max(9)
+      .nullable(),
+    dietaryPreference: z.enum(["none", "vegetarian", "vegan", "pescatarian"]).nullable(),
+    foodAllergies: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(80)
+          .refine(
+            (value) => !/[\u0000-\u001f\u007f]/.test(value),
+            "allergy names must not contain control characters",
+          ),
+      )
+      .max(20)
+      .nullable(),
+    userGoals: z.array(z.enum(["manage_symptoms", "stay_active"])).max(2).nullable(),
+  })
+  .strict();
+
+const DailyBleedingSchema = z
+  .object({
+    state: z.enum(["bleeding", "spotting", "no_bleeding", "unsure"]),
+    flow: z.enum(["light", "moderate", "heavy"]).nullable(),
+  })
+  .strict()
+  .superRefine((bleeding, context) => {
+    if (bleeding.state !== "bleeding" && bleeding.flow !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "flow must be null unless state is bleeding",
+        path: ["flow"],
+      });
+    }
+  });
+
+export const DailyInsightsV2ContextSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    cycleDay: z.number().int().min(1).max(100).nullable(),
+    phase: z
+      .object({
+        value: z.enum(["menstrual", "follicular", "ovulation", "luteal"]).nullable(),
+        basis: z.enum(["recorded_bleeding", "estimated", "unknown"]),
+        limitations: z.array(z.enum(PhaseLimitationCodes)).max(6),
+      })
+      .strict()
+      .superRefine((phase, context) => {
+        if (new Set(phase.limitations).size !== phase.limitations.length) {
+          context.addIssue({
+            code: "custom",
+            message: "phase limitations must be unique",
+            path: ["limitations"],
+          });
+        }
+        if (phase.basis === "unknown" && phase.value !== null) {
+          context.addIssue({
+            code: "custom",
+            message: "phase value must be null when basis is unknown",
+            path: ["value"],
+          });
+        }
+      }),
+    symptoms: z.array(createWellnessSymptomSchema(2)).max(39),
+    dailyBleeding: DailyBleedingSchema.nullable(),
+    preferences: DailyInsightsPreferencesSchema,
+    requestedSections: z
+      .array(z.enum(DailyInsightSectionKinds))
+      .min(1)
+      .max(DailyInsightSectionKinds.length)
+      .superRefine((sections, context) => {
+        const seen = new Set<string>();
+        sections.forEach((section, index) => {
+          if (seen.has(section)) {
+            context.addIssue({
+              code: "custom",
+              message: "requested sections must be unique",
+              path: [index],
+            });
+          }
+          seen.add(section);
+        });
+      }),
+  })
+  .strict()
+  .superRefine((dailyInsights, context) => {
+    if (
+      dailyInsights.phase.basis === "recorded_bleeding" &&
+      (dailyInsights.phase.value !== "menstrual" ||
+        dailyInsights.dailyBleeding?.state !== "bleeding")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "recorded_bleeding phase requires today's bleeding observation",
+        path: ["phase", "basis"],
+      });
+    }
+    if (dailyInsights.phase.basis === "estimated" && dailyInsights.phase.value === null) {
+      context.addIssue({
+        code: "custom",
+        message: "estimated phase requires a phase value",
+        path: ["phase", "value"],
+      });
+    }
+    if (
+      dailyInsights.dailyBleeding?.state === "bleeding" &&
+      dailyInsights.phase.basis === "estimated" &&
+      dailyInsights.phase.value !== "menstrual" &&
+      !dailyInsights.phase.limitations.includes("conflicting_evidence")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "conflicting phase and bleeding evidence must be identified",
+        path: ["phase", "limitations"],
+      });
+    }
+  });
+
+const AvailableDailyInsightSectionSchema = z
+  .object({
+    kind: z.enum(DailyInsightSectionKinds),
+    status: z.literal("available"),
+    suggestions: z.array(shortText).min(1).max(6),
+    unavailableReason: z.null(),
+  })
+  .strict();
+
+const UnavailableDailyInsightSectionSchema = z
+  .object({
+    kind: z.enum(DailyInsightSectionKinds),
+    status: z.literal("unavailable"),
+    suggestions: z.array(shortText).max(0),
+    unavailableReason: z.enum([
+      "missing_preferences",
+      "insufficient_context",
+      "safety_limit",
+    ]),
+  })
+  .strict();
+
+export const DailyInsightsV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    sections: z
+      .array(
+        z.discriminatedUnion("status", [
+          AvailableDailyInsightSectionSchema,
+          UnavailableDailyInsightSectionSchema,
+        ]),
+      )
+      .min(1)
+      .max(DailyInsightSectionKinds.length)
+      .superRefine((sections, context) => {
+        const seen = new Set<string>();
+        sections.forEach((section, index) => {
+          if (seen.has(section.kind)) {
+            context.addIssue({
+              code: "custom",
+              message: "section kinds must be unique",
+              path: [index, "kind"],
+            });
+          }
+          seen.add(section.kind);
+        });
+      }),
+    explanation: mediumText,
+    safetyMessage,
+  })
+  .strict()
+  .superRefine((dailyInsights, context) => {
+    if (
+      dailyInsights.sections.some(
+        (section) =>
+          section.status === "unavailable" && section.unavailableReason === "safety_limit",
+      ) &&
+      dailyInsights.safetyMessage === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "safety-limited sections require a safety message",
+        path: ["safetyMessage"],
+      });
+    }
+  });
+
 export function createCycleSummaryContextSchema(version: SymptomCatalogVersion) {
   return z
     .object({
@@ -211,6 +432,7 @@ export const AnswerCycleQuestionContextSchema = createAnswerCycleQuestionContext
 
 export type ExplainInsightContext = z.infer<ReturnType<typeof createExplainInsightContextSchema>>;
 export type DailyWellnessContext = z.infer<ReturnType<typeof createDailyWellnessContextSchema>>;
+export type DailyInsightsV2Context = z.infer<typeof DailyInsightsV2ContextSchema>;
 export type CycleSummaryContext = z.infer<ReturnType<typeof createCycleSummaryContextSchema>>;
 export type AnswerCycleQuestionContext = z.infer<
   ReturnType<typeof createAnswerCycleQuestionContextSchema>
@@ -254,5 +476,6 @@ export const CycleQuestionAnswerSchema = z
 
 export type ExplainInsight = z.infer<typeof ExplainInsightSchema>;
 export type DailyWellnessRecommendation = z.infer<typeof DailyWellnessRecommendationSchema>;
+export type DailyInsightsV2 = z.infer<typeof DailyInsightsV2Schema>;
 export type CycleSummary = z.infer<typeof CycleSummarySchema>;
 export type CycleQuestionAnswer = z.infer<typeof CycleQuestionAnswerSchema>;

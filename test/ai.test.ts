@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { HttpRequest, InvocationContext } from "@azure/functions";
+import { HttpRequest, type InvocationContext } from "@azure/functions";
 import { AIUnavailableError } from "../src/ai/openAIClient";
 import { ai, processAIRequest } from "../src/functions/ai";
 
@@ -13,6 +13,27 @@ const normalizeRequest = {
   task: "normalize_symptoms",
   context: { text: "I'm exhausted, bloated, and my lower back hurts." },
 };
+
+const encoder = new TextEncoder();
+
+function paddedBody(value: unknown, totalBytes: number, includeBom = false): Uint8Array {
+  const json = encoder.encode(JSON.stringify(value));
+  const bom = includeBom ? Uint8Array.from([0xef, 0xbb, 0xbf]) : new Uint8Array();
+  assert.ok(json.byteLength + bom.byteLength <= totalBytes);
+  const bytes = new Uint8Array(totalBytes);
+  bytes.fill(0x20);
+  bytes.set(bom, 0);
+  bytes.set(json, bom.byteLength);
+  return bytes;
+}
+
+function httpRequest(bytes: Uint8Array): HttpRequest {
+  return new HttpRequest({
+    method: "POST",
+    url: "https://example.test/api/ai",
+    body: { bytes },
+  });
+}
 
 test("normalizes a valid symptom request", async () => {
   const response = await processAIRequest(sampleRequest, {
@@ -169,12 +190,11 @@ test("rejects a malformed request", async () => {
 
 test("rejects malformed JSON at the HTTP boundary without logging parser details", async () => {
   const logs: string[] = [];
-  const request = {
-    headers: new Headers(),
-    json: async () => {
-      throw new SyntaxError("private parser detail");
-    },
-  } as unknown as HttpRequest;
+  const request = new HttpRequest({
+    method: "POST",
+    url: "https://example.test/api/ai",
+    body: { string: '{"private parser detail":' },
+  });
   const context = {
     log: (...values: unknown[]) => logs.push(values.join(" ")),
   } as unknown as InvocationContext;
@@ -188,6 +208,43 @@ test("rejects malformed JSON at the HTTP boundary without logging parser details
   });
   assert.match(logs[0] ?? "", /^task=unknown status=400 durationMs=\d+$/);
   assert.equal(logs.some((entry) => entry.includes("private parser detail")), false);
+});
+
+test("enforces exact raw-byte limits for ASCII, multibyte, and BOM requests", async () => {
+  const logs: string[] = [];
+  const context = {
+    log: (...values: unknown[]) => logs.push(values.join(" ")),
+  } as unknown as InvocationContext;
+  const multibyteRequest = {
+    task: "normalize_symptoms",
+    context: { text: "🙂".repeat(2_000) },
+  };
+  const dependencies = {
+    normalizeSymptoms: async () => ({ symptoms: [] }),
+  };
+
+  for (const bytes of [
+    paddedBody(normalizeRequest, 32 * 1_024),
+    paddedBody(multibyteRequest, 32 * 1_024),
+    paddedBody(normalizeRequest, 32 * 1_024, true),
+  ]) {
+    const response = await ai(httpRequest(bytes), context, dependencies);
+    assert.equal(response.status, 200);
+  }
+
+  for (const bytes of [
+    paddedBody(normalizeRequest, 32 * 1_024 + 1),
+    paddedBody(multibyteRequest, 32 * 1_024 + 1),
+    paddedBody(normalizeRequest, 32 * 1_024 + 1, true),
+  ]) {
+    const response = await ai(httpRequest(bytes), context, dependencies);
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.jsonBody, {
+      success: false,
+      error: { code: "INVALID_REQUEST", message: "request body is too large" },
+    });
+  }
+  assert.equal(logs.every((entry) => /^task=\w+ status=(?:200|400) durationMs=\d+$/.test(entry)), true);
 });
 
 test("rejects an unsupported task", async () => {

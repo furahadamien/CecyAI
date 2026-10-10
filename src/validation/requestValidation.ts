@@ -1,4 +1,5 @@
 import {
+  DailyInsightsV2ContextSchema,
   NormalizeSymptomsContextSchema,
   createAnswerCycleQuestionContextSchema,
   createCycleSummaryContextSchema,
@@ -9,12 +10,13 @@ import type { SymptomCatalogVersion } from "../ai/symptomCatalog";
 import type { AITaskName } from "../ai/systemInstructions";
 import type { AIRequest } from "../models/AIRequest";
 
-const MAX_REQUEST_BYTES = 32 * 1_024;
+export const MAX_REQUEST_BYTES = 32 * 1_024;
 
 export const SUPPORTED_TASKS: readonly AITaskName[] = [
   "normalize_symptoms",
   "explain_insight",
   "daily_wellness_recommendation",
+  "daily_insights_v2",
   "cycle_summary",
   "answer_cycle_question",
 ];
@@ -93,6 +95,29 @@ export function validateAIRequest(
     }
     case "daily_wellness_recommendation": {
       const result = createDailyWellnessContextSchema(catalogVersion).safeParse(body.context);
+      return result.success
+        ? {
+            success: true,
+            data: { task: body.task, context: result.data, catalogVersion },
+          }
+        : invalidContext(body.task, result.error.issues[0]?.path ?? []);
+    }
+    case "daily_insights_v2": {
+      if (catalogVersion !== 2) {
+        return {
+          success: false,
+          code: "INVALID_REQUEST",
+          message: "daily_insights_v2 requires X-Cecy-Symptom-Catalog-Version 2",
+        };
+      }
+      if (Object.keys(body).some((key) => key !== "task" && key !== "context")) {
+        return {
+          success: false,
+          code: "INVALID_REQUEST",
+          message: "request contains unsupported fields",
+        };
+      }
+      const result = DailyInsightsV2ContextSchema.safeParse(body.context);
       return result.success
         ? {
             success: true,

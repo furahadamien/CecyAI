@@ -1,6 +1,10 @@
 .git
 .gitignore
+.copilot-azure
 local.settings.json
 node_modules
 test
+dist/test
+fixtures
 *.log
+*.md

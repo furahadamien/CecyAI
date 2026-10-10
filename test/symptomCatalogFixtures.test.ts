@@ -36,6 +36,8 @@ function dependencyFor(task: keyof TaskDependencies, data: unknown): Partial<Tas
       return { explainInsight: async () => data };
     case "wellnessRecommendation":
       return { wellnessRecommendation: async () => data };
+    case "dailyInsightsV2":
+      return { dailyInsightsV2: async () => data };
     case "cycleSummary":
       return { cycleSummary: async () => data };
     case "answerCycleQuestion":

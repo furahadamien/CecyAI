@@ -134,7 +134,7 @@ Task context and model output objects reject extra fields. Unknown top-level req
 
 ### Task request constraints
 
-All request bodies are limited to 32 KiB after parsed JSON is canonicalized with `JSON.stringify()`. This is not a raw HTTP-body limit.
+All request bodies are limited to 32 KiB of raw bytes before UTF-8 decoding and JSON parsing, then checked again after parsed JSON is canonicalized with `JSON.stringify()`.
 
 `normalize_symptoms`:
 
@@ -269,12 +269,12 @@ The v1/v2 request-response fixtures are executed against request and final respo
 - Client cancellation does not guarantee immediate cancellation of provider work.
 - Function authorization: anonymous.
 - Application quotas/rate limiting: none.
-- Raw request-body edge limit: not enforced by application code; only the parsed canonicalized 32 KiB guard is present.
+- Raw request-body edge limit: application code enforces 32 KiB before UTF-8 decoding and JSON parsing; ingress controls remain recommended for defense in depth.
 
 Security review found no regression introduced by catalog v2. Two inherited production risks remain:
 
 1. Anonymous callers can consume paid model capacity without a quota.
-2. Large whitespace-heavy JSON is parsed before the canonicalized-size check.
+2. Azure ingress still materializes requests before application code applies the 32 KiB raw-byte check.
 
 Application logs include only allowlisted task, status, and duration. They do not intentionally log raw text, questions, symptom arrays, request/response bodies, or provider errors. Azure platform and Application Insights telemetry must be reviewed separately.
 
@@ -328,7 +328,7 @@ Acceptance classification:
 | CAT-04 Normalization | PASS | Empty arrays, uniqueness, nullable severity, versioned enums, 20/39 schema bounds, and malformed output rejection are implemented. |
 | CAT-05 Meaning | PASS | All 11 synthetic normalization evaluation cases passed against the deployed model, including all codes, negation, overlap, rating semantics, empty output, and adversarial text. This is contract evidence, not clinical accuracy evidence. |
 | CAT-06 Safety | PARTIAL | The deployed severe-vomiting/peanut-allergy case produced a safety message without a detected allergen conflict. Broader diagnosis, fertility, reassurance, and supplied-fact fidelity evaluation remains limited. |
-| CAT-07 Failure behavior | PARTIAL | Invalid input, oversized canonicalized payload, mocked outage, and malformed output are tested. Provider timeout/rate-limit behavior is documented but not integration-tested. |
+| CAT-07 Failure behavior | PARTIAL | Invalid input, oversized raw/canonicalized payload, mocked outage, and malformed output are tested. Provider timeout/rate-limit behavior is documented but not integration-tested. |
 | CAT-08 Privacy/security | PARTIAL | Application logging and fixture hygiene were reviewed; no persistence was added. Provider retention and platform telemetry remain unverified; inherited abuse gaps remain. |
 | CAT-09 Client fixtures | PASS | Machine-readable v1/v2, mapping, error, and evaluation fixtures are delivered. |
 | CAT-10 Delivery | PASS | Build/tests/audit/reviews are complete, the branch is pushed, revision `44af85ec…` is deployed and verified, and rollback behavior is documented. No PR exists. |

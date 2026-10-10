@@ -1,0 +1,38 @@
+{
+  "fixtureType": "mock_contract",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "2"
+  },
+  "request": {
+    "task": "daily_insights_v2",
+    "context": {
+      "schemaVersion": 2,
+      "cycleDay": null,
+      "phase": { "value": null, "basis": "unknown", "limitations": ["cycle_day_unavailable"] },
+      "symptoms": [],
+      "dailyBleeding": null,
+      "preferences": {
+        "activityLevel": null,
+        "preferredExercises": null,
+        "dietaryPreference": null,
+        "foodAllergies": null,
+        "userGoals": null
+      },
+      "requestedSections": ["food", "movement", "recovery"]
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "schemaVersion": 2,
+      "sections": [
+        { "kind": "food", "status": "unavailable", "suggestions": [], "unavailableReason": "missing_preferences" },
+        { "kind": "movement", "status": "unavailable", "suggestions": [], "unavailableReason": "missing_preferences" },
+        { "kind": "recovery", "status": "available", "suggestions": ["Make room for a regular wind-down routine tonight."], "unavailableReason": null }
+      ],
+      "explanation": "Food and movement need preference answers before they can be personalized safely.",
+      "safetyMessage": null
+    }
+  }
+}

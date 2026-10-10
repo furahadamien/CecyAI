@@ -12,7 +12,7 @@ The service does not store user health data and is not the source of truth for c
 - Optional header: `X-Cecy-Symptom-Catalog-Version: 1|2`
 - Authorization: Anonymous; no key or token is currently required
 - Application rate limiting: Not implemented
-- Parsed JSON limit: 32 KiB after canonicalization with `JSON.stringify()`
+- Raw request limit: 32 KiB before JSON parsing; parsed JSON is checked again after canonicalization
 
 The production endpoint is publicly reachable. It should be treated as a prototype API until authentication and request controls are added.
 
@@ -21,6 +21,7 @@ Supported tasks:
 - `normalize_symptoms`
 - `explain_insight`
 - `daily_wellness_recommendation`
+- `daily_insights_v2`
 - `cycle_summary`
 - `answer_cycle_question`
 
@@ -364,7 +365,116 @@ Severe-symptom safety test:
 
 The intended behavior is cautious guidance, no intense activity, and a non-null safety message suggesting professional evaluation. This behavior was smoke-tested for the earlier production contract, but catalog-v2 model behavior has not been live-tested. It is not a schema-level guarantee because the response schema permits `safetyMessage: null`.
 
-## 4. Cycle Summary
+## 4. Daily Insights V2
+
+Returns ordered daily guidance for explicitly requested sections. This task is additive; `daily_wellness_recommendation` remains unchanged.
+
+Required headers:
+
+```http
+Content-Type: application/json
+X-Cecy-Symptom-Catalog-Version: 2
+```
+
+Request:
+
+```json
+{
+  "task": "daily_insights_v2",
+  "context": {
+    "schemaVersion": 2,
+    "cycleDay": 2,
+    "phase": {
+      "value": "menstrual",
+      "basis": "recorded_bleeding",
+      "limitations": []
+    },
+    "symptoms": [
+      { "type": "cramps", "severity": "moderate" },
+      { "type": "fatigue", "severity": null }
+    ],
+    "dailyBleeding": { "state": "bleeding", "flow": "moderate" },
+    "preferences": {
+      "activityLevel": "moderately_active",
+      "preferredExercises": ["walking", "yoga"],
+      "dietaryPreference": "vegetarian",
+      "foodAllergies": ["Peanuts"],
+      "userGoals": ["manage_symptoms", "stay_active"]
+    },
+    "requestedSections": [
+      "self_care",
+      "food",
+      "movement",
+      "hydration",
+      "recovery",
+      "skincare"
+    ]
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "kind": "self_care",
+        "status": "available",
+        "suggestions": ["Use a warm compress if it feels comfortable."],
+        "unavailableReason": null
+      },
+      {
+        "kind": "food",
+        "status": "available",
+        "suggestions": ["Choose a lentil and rice bowl made from ingredients you already trust."],
+        "unavailableReason": null
+      }
+    ],
+    "explanation": "These options prioritize the supplied symptoms and preferences.",
+    "safetyMessage": null
+  }
+}
+```
+
+Request contract:
+
+- `schemaVersion`: required literal `2`.
+- `cycleDay`: required integer 1 to 100 or explicit `null`; never clamp an unavailable value.
+- `phase.value`: `menstrual`, `follicular`, `ovulation`, `luteal`, or `null`.
+- `phase.basis`: `recorded_bleeding`, `estimated`, or `unknown`.
+- `phase.limitations`: unique allowlisted values: `cycle_day_unavailable`, `insufficient_cycle_history`, `irregular_cycle`, `overdue_period`, `phase_boundary_uncertain`, `conflicting_evidence`.
+- Unknown phase requires `value: null`; estimated phase requires a value.
+- Recorded-bleeding phase requires `value: "menstrual"` and today's bleeding observation.
+- Estimated non-menstrual phase plus today's bleeding requires `conflicting_evidence`.
+- `symptoms`: required array of at most 39 catalog-v2 items. Empty means no supplied symptoms, not symptom absence.
+- `dailyBleeding`: required object or explicit `null`. State is `bleeding`, `spotting`, `no_bleeding`, or `unsure`. Flow is `light`, `moderate`, `heavy`, or `null`; only `bleeding` may have non-null flow.
+- Every preference key is required but nullable. Null means unanswered, while an empty array means answered with no selections.
+- Activity: `beginner`, `moderately_active`, `very_active`, or `null`.
+- Exercises: `walking`, `running`, `strength_training`, `cycling`, `yoga`, `pilates`, `swimming`, `sports`, `home_workouts`, or `null` for the array.
+- Diet: `none`, `vegetarian`, `vegan`, `pescatarian`, or `null`.
+- Allergies: at most 20 strings, each 1 to 80 code points without control characters, or `null`.
+- Goals: `manage_symptoms`, `stay_active`, or `null` for the array.
+- `requestedSections`: 1 to 6 unique values from `self_care`, `food`, `movement`, `hydration`, `recovery`, `skincare`.
+
+Response contract:
+
+- Exactly one section is returned per requested kind, in the same order, with no extras.
+- Available section: `status: "available"`, 1 to 6 suggestions, and `unavailableReason: null`.
+- Unavailable section: `status: "unavailable"`, empty suggestions, and reason `missing_preferences`, `insufficient_context`, or `safety_limit`.
+- Food is unavailable with `missing_preferences` when diet or allergy answers are null.
+- Food is unavailable with `insufficient_context` when supplied allergy text cannot be conservatively interpreted. Recognized common forms include names, `"peanut allergy"`, `"allergic to peanuts"`, and comma/and-separated common allergens.
+- Movement is unavailable with `missing_preferences` when activity or exercise answers are null, except that severe-symptom safety takes precedence.
+- Severe symptoms require a non-null safety message; requested movement is returned as `safety_limit`, including when movement preferences are missing.
+- Suggestions are 1 to 200 code points. Explanation is 1 to 1,000. Safety message is required and nullable, otherwise 1 to 600.
+- Deterministic output checks conservatively reject recognized supplied/common allergens, known diet conflicts, allergen-free promises, prohibited skincare actives/prescription guidance, diagnosis and ovulation-confirmation claims, fertility-safety claims, medication guidance, doses, URI schemes, domain-like references, Markdown links, HTML, and control characters. These lexical checks are defense in depth, not a complete medical or content-safety guarantee.
+
+Complete synthetic fixtures are in `fixtures/daily-insights-v2/`, including sparse phase, missing preferences, safety refusal, invalid input, throttling, timeout, and upstream unavailability.
+
+## 5. Cycle Summary
 
 Summarizes only deterministic cycle statistics and observations supplied by the client.
 
@@ -417,7 +527,7 @@ Limits:
 - `highlights`: zero to eight entries, each 1 to 300 characters
 - `safetyMessage`: `null` or 1 to 600 characters
 
-## 5. Answer Cycle Question
+## 6. Answer Cycle Question
 
 Answers a natural-language question using only supplied facts. The function does not fetch user history.
 
@@ -631,6 +741,7 @@ Important files:
 - `src/validation/requestValidation.ts`: Request-size guard and task-specific validation
 - `src/ai/symptomCatalog.ts`: Canonical version negotiation and 13/39-code catalogs
 - `src/ai/taskRouter.ts`: Extensible routing and final output validation
+- `src/ai/dailyInsightsPolicy.ts`: Deterministic daily-insights safety and preference checks
 - `src/ai/openAIClient.ts`: Reusable OpenAI client, timeout, retries, and structured parsing
 - `src/ai/systemInstructions.ts`: Shared safety and task instructions
 - `src/ai/schemas.ts`: Input and output contracts
@@ -650,7 +761,8 @@ Important files:
 - `APP_ENVIRONMENT` is required but does not currently alter behavior
 - Maximum output: 1,200 tokens
 - Timeout: 20 seconds
-- SDK retries: 2
+- SDK retries: 2 for existing tasks; 0 for `daily_insights_v2` to avoid duplicate provider operations after ambiguous failures
+- Client-visible and application-level idempotency/deduplication are not implemented; no caller key is accepted or retained
 - Client is lazily initialized and reused across warm invocations
 
 Required environment variables:
@@ -664,7 +776,7 @@ APP_ENVIRONMENT
 Current non-secret production configuration:
 
 ```text
-OPENAI_MODEL=gpt-5.5
+OPENAI_MODEL=gpt-6-luna
 APP_ENVIRONMENT=production
 ```
 
@@ -677,7 +789,7 @@ Server-controlled instructions require the model to:
 - Avoid diagnosing PCOS, endometriosis, pregnancy, infertility, hormonal disorders, or any condition
 - Avoid claiming that symptoms prove a condition
 - Avoid prescription medication and medical treatment plans
-- Avoid unsafe supplements, extreme diets, extreme calorie restriction, extreme exercise, and fertility guarantees
+- Avoid medication or supplement doses, unsafe supplements, extreme diets, extreme calorie restriction, extreme exercise, fertility guarantees, and fertility-safety claims
 - Avoid claiming that foods cure menstrual symptoms
 - Treat cycle phase only as supporting context
 - Become cautious and include a safety message for severe or concerning supplied symptoms
@@ -689,9 +801,11 @@ Server-controlled instructions require the model to:
 - Accepted context is transmitted to OpenAI for processing
 - Application-level code does not persist request context
 - OpenAI processing and retention follow the configured OpenAI account's data controls
+- OpenAI account retention/training settings, processing geography, and deletion behavior have not been independently verified in this repository
 - Application logs do not include raw health context, request bodies, questions, or model output
 - The application log line contains only allowlisted task, status, and duration
 - Azure Functions and Application Insights may separately retain platform telemetry
+- Azure dependency-telemetry fields and retention periods have not been independently verified in this repository
 
 Example application log:
 
@@ -706,9 +820,9 @@ npm test
 npm audit --omit=dev
 ```
 
-The 41-test suite covers all five valid tasks, malformed values and JSON, catalog negotiation, all 39 v2 codes, v1 isolation, multi-symptom facts, rating nullability, duplicate output rejection, Unicode boundaries, executable fixtures, oversized arrays and bodies, OpenAI failures, invalid structured responses, and privacy-safe malformed-JSON logging.
+The 76-test suite covers all six tasks, daily-insights schemas and fixtures, exact top-level request shape, missing preferences, sparse/irregular/overdue/conflicting phase evidence, all 39 symptom types, severe-symptom precedence, descriptive/compound/uninterpretable allergies, diet conflicts, skincare restrictions, prohibited medical claims and doses, links and markup, catalog negotiation, v1 isolation, Unicode boundaries, raw and canonical request limits, upstream failures, invalid structured responses, and privacy-safe malformed-JSON logging.
 
-Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is prompted but is not deterministically enforced by the schema.
+Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is enforced after schema validation by deterministic task policy.
 
 ## Deployment
 
@@ -752,19 +866,19 @@ Expected function:
 }
 ```
 
-After deployment, run all five cURL examples with synthetic data. Each should return HTTP 200, `success: true`, and its documented schema. Send `{ "context": {} }` and confirm HTTP 400 with `INVALID_REQUEST`.
+After deployment, run all six task examples with synthetic data. Each should return HTTP 200, `success: true`, and its documented schema. Send `{ "context": {} }` and confirm HTTP 400 with `INVALID_REQUEST`.
 
 No deployment slot or automated rollback is configured. Retain a known-good source revision before deployment. If verification fails, redeploy that revision with the same remote-build command.
 
 ## Current Deployment
 
 - Azure Function App: `cecyaiendpoints`
-- Deployed and verified: October 1, 2026 at approximately 18:15 UTC
-- Build: Azure Oryx remote build from a 27.46 KiB source package
-- Deployment provenance: no source-control commit ID was recorded for this deployment
+- Deployed and verified: October 10, 2026 at approximately 20:18 UTC
+- Build: successful Azure Oryx remote build from a 48.67 KB source package
+- Deployment provenance: uncommitted `feature/daily-insights-v2` working tree based on `fd7dc947293d3a5585750406e2190f0e0e78769d`; runtime-source SHA-256 `6077a8145f0e94b45457166fa557fb958fb15870fea0b9154a9119f9dc2f0f87`
 - Trigger: `cecyaiendpoints/ai`
-- Verification: all five synthetic production task calls returned HTTP 200 structured responses; invalid input returned HTTP 400
-- Automated validation at deployment: 14 tests passed
+- Verification: sparse and full-six-section `daily_insights_v2` calls returned HTTP 200 structured responses in exact order; missing header and invalid input returned HTTP 400; legacy normalization returned HTTP 200
+- Automated validation at deployment: 76 tests passed
 - Runtime dependency audit at deployment: 0 known vulnerabilities
 
-For detailed implementation and agent continuation notes, see [HANDOFF.md](HANDOFF.md).
+For the deployed daily-insights contract and iOS checklist, see [DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md](DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md). For general implementation and agent continuation notes, see [HANDOFF.md](HANDOFF.md).

@@ -1,0 +1,38 @@
+{
+  "fixtureType": "mock_contract",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Cecy-Symptom-Catalog-Version": "2"
+  },
+  "request": {
+    "task": "daily_insights_v2",
+    "context": {
+      "schemaVersion": 2,
+      "cycleDay": 18,
+      "phase": { "value": "luteal", "basis": "estimated", "limitations": ["phase_boundary_uncertain"] },
+      "symptoms": [{ "type": "vomiting", "severity": "severe" }],
+      "dailyBleeding": null,
+      "preferences": {
+        "activityLevel": "very_active",
+        "preferredExercises": ["running", "strength_training"],
+        "dietaryPreference": "vegan",
+        "foodAllergies": ["Tree nuts"],
+        "userGoals": ["stay_active"]
+      },
+      "requestedSections": ["movement", "hydration", "recovery"]
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "schemaVersion": 2,
+      "sections": [
+        { "kind": "movement", "status": "unavailable", "suggestions": [], "unavailableReason": "safety_limit" },
+        { "kind": "hydration", "status": "available", "suggestions": ["Take small, regular sips of fluid if tolerated."], "unavailableReason": null },
+        { "kind": "recovery", "status": "available", "suggestions": ["Prioritize rest while symptoms are severe."], "unavailableReason": null }
+      ],
+      "explanation": "Movement guidance is withheld because severe vomiting was supplied.",
+      "safetyMessage": "Consider prompt medical advice for severe or persistent vomiting or signs of dehydration."
+    }
+  }
+}
