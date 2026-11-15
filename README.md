@@ -668,6 +668,67 @@ Content-Type: application/json
 
 This returns `404` when the user ID does not exist. Successful responses include `userId`, `displayName`, `status`, `createdAt`, and `updatedAt`.
 
+## Usage Telemetry
+
+Anonymous, first-party usage events from the iOS app. Additive: separate function, schema, store and tables; it shares no code path with `/api/ai` or `/api/users`. The iOS event catalog and analysis guide is `TELEMETRY.md` in the iOS repository.
+
+```http
+POST /api/telemetry
+Content-Type: application/json
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "installId": "0b6f7a3e-2c1d-4e5f-8a9b-0c1d2e3f4a5b",
+  "installDay": "2026-11-01",
+  "sessionId": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "app": { "version": "1.0.4", "build": "9" },
+  "device": {
+    "family": "iphone",
+    "model": "iPhone16,2",
+    "osVersion": "26.1",
+    "language": "en",
+    "region": "US",
+    "timeZoneOffsetMinutes": -480
+  },
+  "events": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "screen_view",
+      "timestamp": "2026-11-15T11:00:00.000Z",
+      "screen": "today",
+      "properties": { "previous_screen": "calendar" }
+    }
+  ]
+}
+```
+
+Contract (`src/telemetry/telemetrySchema.ts`):
+
+- Strict objects; unknown fields are rejected. `installId`, `sessionId` and event `id` are lowercase UUIDs.
+- Event `name`, `screen` and property keys are snake_case tokens. Property values are booleans, finite numbers, or short strings of `[A-Za-z0-9 ._:+-/]` (at most 80); free text, markup and newlines are rejected.
+- 1 to 100 events per batch, at most 30 properties per event, at most 64 KiB body.
+- Events older than 45 days or more than 24 hours in the future, and duplicate IDs within a batch, are dropped (counted in `dropped`).
+- Success: `202 { "success": true, "data": { "accepted": n, "dropped": m } }`. Invalid: `400`/`413` (clients drop the batch). Storage failure: `503 STORAGE_UNAVAILABLE` (clients retry). Event rows are upserted by `installId_eventId`, so retries are idempotent.
+- No IP address, user agent or request body is logged or stored. Log line: `operation=telemetry status=202 events=12 durationMs=85`.
+
+Storage (`src/telemetry/telemetryStore.ts`), created automatically on first use in the same storage account as the user registry:
+
+| Table | PartitionKey | RowKey | Purpose |
+| --- | --- | --- | --- |
+| `CecyTelemetryEvents` | UTC day `yyyyMMdd` | `installId_eventId` | Every event; properties flattened as `p_<key>` columns |
+| `CecyTelemetryDaily` | UTC day `yyyyMMdd` | `installId` | One row per active install per day: event/session/screen counts, `daysSinceInstall` |
+| `CecyTelemetryInstalls` | install month `yyyyMM` | `installId` | Cohort row: first/last seen, `activeDays`, totals, `milestone_*` first timestamps, latest `user_state` as `s_<key>` columns |
+
+Configuration (all optional):
+
+- `TELEMETRY_STORAGE_CONNECTION`: falls back to `USER_REGISTRY_STORAGE_CONNECTION`, then `AzureWebJobsStorage`
+- `TELEMETRY_TABLE_PREFIX`: default `CecyTelemetry`
+- `TELEMETRY_DISABLED=true`: kill switch; returns `202` with `accepted: 0` so clients clear their queue without storing anything
+
+Like the other endpoints, this route is `anonymous` and has no application rate limiting.
+
 ## Errors
 
 Supported codes:
@@ -738,6 +799,7 @@ Client
 Important files:
 
 - `src/functions/ai.ts`: HTTP registration, response wrapper, error mapping, and operational logging
+- `src/functions/telemetry.ts`, `src/telemetry/`: Anonymous usage telemetry endpoint, contract and Azure Table storage
 - `src/validation/requestValidation.ts`: Request-size guard and task-specific validation
 - `src/ai/symptomCatalog.ts`: Canonical version negotiation and 13/39-code catalogs
 - `src/ai/taskRouter.ts`: Extensible routing and final output validation
