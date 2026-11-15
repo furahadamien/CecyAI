@@ -882,7 +882,7 @@ npm test
 npm audit --omit=dev
 ```
 
-The 76-test suite covers all six tasks, daily-insights schemas and fixtures, exact top-level request shape, missing preferences, sparse/irregular/overdue/conflicting phase evidence, all 39 symptom types, severe-symptom precedence, descriptive/compound/uninterpretable allergies, diet conflicts, skincare restrictions, prohibited medical claims and doses, links and markup, catalog negotiation, v1 isolation, Unicode boundaries, raw and canonical request limits, upstream failures, invalid structured responses, and privacy-safe malformed-JSON logging.
+The 83-test suite covers all six tasks, usage telemetry validation/storage/idempotency/kill switch, daily-insights schemas and fixtures, exact top-level request shape, missing preferences, sparse/irregular/overdue/conflicting phase evidence, all 39 symptom types, severe-symptom precedence, descriptive/compound/uninterpretable allergies, diet conflicts, skincare restrictions, prohibited medical claims and doses, links and markup, catalog negotiation, v1 isolation, Unicode boundaries, raw and canonical request limits, upstream failures, invalid structured responses, and privacy-safe malformed-JSON logging.
 
 Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is enforced after schema validation by deterministic task policy.
 
@@ -935,12 +935,12 @@ No deployment slot or automated rollback is configured. Retain a known-good sour
 ## Current Deployment
 
 - Azure Function App: `cecyaiendpoints`
-- Deployed and verified: October 10, 2026 at approximately 20:18 UTC
-- Build: successful Azure Oryx remote build from a 48.67 KB source package
-- Deployment provenance: uncommitted `feature/daily-insights-v2` working tree based on `fd7dc947293d3a5585750406e2190f0e0e78769d`; runtime-source SHA-256 `6077a8145f0e94b45457166fa557fb958fb15870fea0b9154a9119f9dc2f0f87`
-- Trigger: `cecyaiendpoints/ai`
-- Verification: sparse and full-six-section `daily_insights_v2` calls returned HTTP 200 structured responses in exact order; missing header and invalid input returned HTTP 400; legacy normalization returned HTTP 200
-- Automated validation at deployment: 76 tests passed
+- Deployed and verified: November 15, 2026 at approximately 22:25 UTC
+- Build: successful Azure Oryx remote build
+- Deployment provenance: commit `ec82cd6` on `feature/improvements-telemetry`
+- Triggers: `ai`, `telemetry`, `upsertUser`, `deactivateUser`
+- Verification: invalid telemetry returned HTTP 400; a stale-only telemetry batch returned HTTP 202 with `accepted: 0` and stored nothing; `daily_insights_v2` without the catalog header returned HTTP 400
+- Automated validation at deployment: 83 tests passed
 - Runtime dependency audit at deployment: 0 known vulnerabilities
 
 For the deployed daily-insights contract and iOS checklist, see [DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md](DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md). For general implementation and agent continuation notes, see [HANDOFF.md](HANDOFF.md).
