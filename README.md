@@ -668,6 +668,67 @@ Content-Type: application/json
 
 This returns `404` when the user ID does not exist. Successful responses include `userId`, `displayName`, `status`, `createdAt`, and `updatedAt`.
 
+## Usage Telemetry
+
+Anonymous, first-party usage events from the iOS app. Additive: separate function, schema, store and tables; it shares no code path with `/api/ai` or `/api/users`. The iOS event catalog and analysis guide is `TELEMETRY.md` in the iOS repository.
+
+```http
+POST /api/telemetry
+Content-Type: application/json
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "installId": "0b6f7a3e-2c1d-4e5f-8a9b-0c1d2e3f4a5b",
+  "installDay": "2026-11-01",
+  "sessionId": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "app": { "version": "1.0.4", "build": "9" },
+  "device": {
+    "family": "iphone",
+    "model": "iPhone16,2",
+    "osVersion": "26.1",
+    "language": "en",
+    "region": "US",
+    "timeZoneOffsetMinutes": -480
+  },
+  "events": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "screen_view",
+      "timestamp": "2026-11-15T11:00:00.000Z",
+      "screen": "today",
+      "properties": { "previous_screen": "calendar" }
+    }
+  ]
+}
+```
+
+Contract (`src/telemetry/telemetrySchema.ts`):
+
+- Strict objects; unknown fields are rejected. `installId`, `sessionId` and event `id` are lowercase UUIDs.
+- Event `name`, `screen` and property keys are snake_case tokens. Property values are booleans, finite numbers, or short strings of `[A-Za-z0-9 ._:+-/]` (at most 80); free text, markup and newlines are rejected.
+- 1 to 100 events per batch, at most 30 properties per event, at most 64 KiB body.
+- Events older than 45 days or more than 24 hours in the future, and duplicate IDs within a batch, are dropped (counted in `dropped`).
+- Success: `202 { "success": true, "data": { "accepted": n, "dropped": m } }`. Invalid: `400`/`413` (clients drop the batch). Storage failure: `503 STORAGE_UNAVAILABLE` (clients retry). Event rows are upserted by `installId_eventId`, so retries are idempotent.
+- No IP address, user agent or request body is logged or stored. Log line: `operation=telemetry status=202 events=12 durationMs=85`.
+
+Storage (`src/telemetry/telemetryStore.ts`), created automatically on first use in the same storage account as the user registry:
+
+| Table | PartitionKey | RowKey | Purpose |
+| --- | --- | --- | --- |
+| `CecyTelemetryEvents` | UTC day `yyyyMMdd` | `installId_eventId` | Every event; properties flattened as `p_<key>` columns |
+| `CecyTelemetryDaily` | UTC day `yyyyMMdd` | `installId` | One row per active install per day: event/session/screen counts, `daysSinceInstall` |
+| `CecyTelemetryInstalls` | install month `yyyyMM` | `installId` | Cohort row: first/last seen, `activeDays`, totals, `milestone_*` first timestamps, latest `user_state` as `s_<key>` columns |
+
+Configuration (all optional):
+
+- `TELEMETRY_STORAGE_CONNECTION`: falls back to `USER_REGISTRY_STORAGE_CONNECTION`, then `AzureWebJobsStorage`
+- `TELEMETRY_TABLE_PREFIX`: default `CecyTelemetry`
+- `TELEMETRY_DISABLED=true`: kill switch; returns `202` with `accepted: 0` so clients clear their queue without storing anything
+
+Like the other endpoints, this route is `anonymous` and has no application rate limiting.
+
 ## Errors
 
 Supported codes:
@@ -738,6 +799,7 @@ Client
 Important files:
 
 - `src/functions/ai.ts`: HTTP registration, response wrapper, error mapping, and operational logging
+- `src/functions/telemetry.ts`, `src/telemetry/`: Anonymous usage telemetry endpoint, contract and Azure Table storage
 - `src/validation/requestValidation.ts`: Request-size guard and task-specific validation
 - `src/ai/symptomCatalog.ts`: Canonical version negotiation and 13/39-code catalogs
 - `src/ai/taskRouter.ts`: Extensible routing and final output validation
@@ -820,7 +882,7 @@ npm test
 npm audit --omit=dev
 ```
 
-The 76-test suite covers all six tasks, daily-insights schemas and fixtures, exact top-level request shape, missing preferences, sparse/irregular/overdue/conflicting phase evidence, all 39 symptom types, severe-symptom precedence, descriptive/compound/uninterpretable allergies, diet conflicts, skincare restrictions, prohibited medical claims and doses, links and markup, catalog negotiation, v1 isolation, Unicode boundaries, raw and canonical request limits, upstream failures, invalid structured responses, and privacy-safe malformed-JSON logging.
+The 83-test suite covers all six tasks, usage telemetry validation/storage/idempotency/kill switch, daily-insights schemas and fixtures, exact top-level request shape, missing preferences, sparse/irregular/overdue/conflicting phase evidence, all 39 symptom types, severe-symptom precedence, descriptive/compound/uninterpretable allergies, diet conflicts, skincare restrictions, prohibited medical claims and doses, links and markup, catalog negotiation, v1 isolation, Unicode boundaries, raw and canonical request limits, upstream failures, invalid structured responses, and privacy-safe malformed-JSON logging.
 
 Tests use injected mock handlers and do not call the live OpenAI API or deployed Azure endpoint. The synthetic evaluation cases are inputs and expected classifications for an approved later live-model evaluation; they are not recorded live-model results. Severe-symptom safety behavior is enforced after schema validation by deterministic task policy.
 
@@ -873,12 +935,12 @@ No deployment slot or automated rollback is configured. Retain a known-good sour
 ## Current Deployment
 
 - Azure Function App: `cecyaiendpoints`
-- Deployed and verified: October 10, 2026 at approximately 20:18 UTC
-- Build: successful Azure Oryx remote build from a 48.67 KB source package
-- Deployment provenance: uncommitted `feature/daily-insights-v2` working tree based on `fd7dc947293d3a5585750406e2190f0e0e78769d`; runtime-source SHA-256 `6077a8145f0e94b45457166fa557fb958fb15870fea0b9154a9119f9dc2f0f87`
-- Trigger: `cecyaiendpoints/ai`
-- Verification: sparse and full-six-section `daily_insights_v2` calls returned HTTP 200 structured responses in exact order; missing header and invalid input returned HTTP 400; legacy normalization returned HTTP 200
-- Automated validation at deployment: 76 tests passed
+- Deployed and verified: November 15, 2026 at approximately 22:25 UTC
+- Build: successful Azure Oryx remote build
+- Deployment provenance: commit `ec82cd6` on `feature/improvements-telemetry`
+- Triggers: `ai`, `telemetry`, `upsertUser`, `deactivateUser`
+- Verification: invalid telemetry returned HTTP 400; a stale-only telemetry batch returned HTTP 202 with `accepted: 0` and stored nothing; `daily_insights_v2` without the catalog header returned HTTP 400
+- Automated validation at deployment: 83 tests passed
 - Runtime dependency audit at deployment: 0 known vulnerabilities
 
 For the deployed daily-insights contract and iOS checklist, see [DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md](DAILY_INSIGHTS_BACKEND_IMPLEMENTATION_HANDOFF.md). For general implementation and agent continuation notes, see [HANDOFF.md](HANDOFF.md).
